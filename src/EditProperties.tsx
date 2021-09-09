@@ -1,85 +1,40 @@
 import React from "react";
 import { produce } from "immer";
-import {
-  InputGroup,
-  InputRightElement,
-  NumberInput,
-  NumberInputField,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { selector, useRecoilState } from "recoil";
+import { InputGroup, InputRightElement, NumberInput, NumberInputField, Text, VStack } from "@chakra-ui/react";
+import { selectorFamily, useRecoilState, useRecoilValue } from "recoil";
 import { selectedElementState } from "./Canvas";
-import { Element, elementState } from "./components/Rectangle/Rectangle";
+import { elementState } from "./components/Rectangle/Rectangle";
+import _ from "lodash";
 
-const selectedElementProperties = selector<Element | undefined>({
-  key: "selectedElementProperties",
-  get: ({ get }) => {
-    const selectedElementId = get(selectedElementState);
-    if (selectedElementId == null) return;
-
-    return get(elementState(selectedElementId));
-  },
-  set: ({ get, set }, newElement) => {
-    const selectedElementId = get(selectedElementState);
-    if (selectedElementId == null) return;
-    if (!newElement) return;
-    set(elementState(selectedElementId), newElement);
-  },
+const editPropertiesState = selectorFamily<number, { path: string; id: number }>({
+  key: "editProperties",
+  get:
+    ({ path, id }) =>
+    ({ get }) => {
+      const element = get(elementState(id));
+      return _.get(element, path);
+    },
+  set:
+    ({ path, id }) =>
+    ({ get, set }, newValue) => {
+      const element = get(elementState(id));
+      const newElement = produce(element, (draft) => _.set(draft, path, newValue));
+      set(elementState(id), newElement);
+    },
 });
 
 export const EditProperties = () => {
-  const [element, setElement] = useRecoilState(selectedElementProperties);
-  if (!element) return null;
-
-  const setPosition = (property: "top" | "left", value: number) => {
-    setElement(
-      produce(element, (draft) => {
-        draft.style.position[property] = value;
-      })
-    );
-  };
-  const setSize = (property: "width" | "height", value: number) => {
-    setElement(
-      produce(element, (draft) => {
-        draft.style.size[property] = value;
-      })
-    );
-  };
-
+  const selectedElement = useRecoilValue(selectedElementState);
+  if (selectedElement == null) return null;
   return (
     <Card>
       <Section heading="Position">
-        <Property
-          label="Top"
-          value={element.style.position.top}
-          onChange={(top) => {
-            setPosition("top", top);
-          }}
-        />
-        <Property
-          label="Left"
-          value={element.style.position.left}
-          onChange={(left) => {
-            setPosition("left", left);
-          }}
-        />
+        <Property label="Top" path="style.position.top" id={selectedElement} />
+        <Property label="Left" path="style.position.left" id={selectedElement} />
       </Section>
       <Section heading="Size">
-        <Property
-          label="Width"
-          value={element.style.size.width}
-          onChange={(width) => {
-            setSize("width", width);
-          }}
-        />
-        <Property
-          label="Height"
-          value={element.style.size.height}
-          onChange={(height) => {
-            setSize("height", height);
-          }}
-        />
+        <Property label="Width" path="style.size.width" id={selectedElement} />
+        <Property label="Height" path="style.size.height" id={selectedElement} />
       </Section>
     </Card>
   );
@@ -94,29 +49,18 @@ const Section: React.FC<{ heading: string }> = ({ heading, children }) => {
   );
 };
 
-const Property = ({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) => {
+const Property = ({ label, path, id }: { label: string; path: string; id: number }) => {
+  const [value, setValue] = useRecoilState(editPropertiesState({ path, id }));
+
   return (
     <div>
       <Text fontSize="14px" fontWeight="500" mb="2px">
         {label}
       </Text>
       <InputGroup size="sm" variant="filled">
-        <NumberInput value={value} onChange={(_, value) => onChange(value)}>
+        <NumberInput value={value} onChange={(_, value) => setValue(value)}>
           <NumberInputField borderRadius="md" />
-          <InputRightElement
-            pointerEvents="none"
-            children="px"
-            lineHeight="1"
-            fontSize="12px"
-          />
+          <InputRightElement pointerEvents="none" children="px" lineHeight="1" fontSize="12px" />
         </NumberInput>
       </InputGroup>
     </div>
